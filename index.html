@@ -28,6 +28,7 @@
             overflow: hidden;
         }
 
+        /* --- FOGGY BACKGROUND --- */
         .fog-container {
             position: fixed;
             width: 100%; height: 100%;
@@ -51,6 +52,7 @@
             to { transform: translateX(-50%); }
         }
 
+        /* --- MAIN MENU --- */
         .main-ui {
             position: relative;
             z-index: 10;
@@ -62,17 +64,18 @@
             background: linear-gradient(90deg, rgba(0,0,0,0.9) 0%, transparent 50%);
         }
 
+        /* UPDATED LOGO STYLING */
         .logo-wrap {
             position: absolute;
             top: 50px; right: 80px;
-            text-align: center;
+            text-align: center; /* Centered relative to its container */
         }
 
         .logo-img { 
-            width: 180px;
+            width: 180px; /* Smaller size */
             height: 180px;
             object-fit: cover;
-            border-radius: 50%;
+            border-radius: 50%; /* Rounded edges */
             border: 2px solid rgba(255, 255, 255, 0.1);
             filter: drop-shadow(0 0 20px rgba(255,255,255,0.2)); 
             animation: breathe 4s ease-in-out infinite;
@@ -86,7 +89,7 @@
         .event-text {
             color: #4facfe;
             font-family: 'Oswald', sans-serif;
-            font-size: 0.9rem;
+            font-size: 0.9rem; /* Slightly smaller to match logo */
             letter-spacing: 2px;
             margin-top: 10px;
             text-shadow: 0 0 10px #4facfe;
@@ -107,6 +110,7 @@
         .nav-btn:hover { color: white; transform: translateX(20px); text-shadow: 0 0 20px white; }
         .btn-play { color: white; font-size: 5rem; border-bottom: 4px solid var(--accent); width: fit-content; }
 
+        /* --- SCREENS --- */
         .screen {
             position: fixed; inset: 0;
             background: rgba(0,0,0,0.97);
@@ -115,6 +119,7 @@
             padding: 40px;
         }
 
+        /* --- GACHA UI --- */
         .rarity-legend {
             position: absolute; top: 40px; right: 40px;
             background: rgba(255,255,255,0.05);
@@ -263,11 +268,6 @@
 
     <script>
         let currentTech = null;
-        // Check if we have saved tech already
-        if(localStorage.getItem("playerTech")) {
-            currentTech = { name: localStorage.getItem("playerTech"), path: localStorage.getItem("playerPath") };
-        }
-
         let spins = { regular: 25, legendary: 25 };
 
         const techniques = [
@@ -286,7 +286,7 @@
         function closeScreens() { document.querySelectorAll('.screen').forEach(s => s.style.display = 'none'); }
 
         function tryPlay() {
-            if (!localStorage.getItem("playerTech")) {
+            if (!currentTech) {
                 const nb = document.getElementById('notif-box');
                 nb.style.display = 'block';
                 setTimeout(() => nb.style.display = 'none', 3000);
@@ -328,11 +328,6 @@
                 }
                 random -= t.weight;
             }
-            
-            // SAVE TO LOCAL STORAGE
-            localStorage.setItem("playerTech", currentTech.name);
-            localStorage.setItem("playerPath", currentTech.path);
-
             updateCard(currentTech);
             document.getElementById('tech-card').style.boxShadow = `0 0 60px ${currentTech.color}`;
         }
