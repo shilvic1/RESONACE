@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RESONACE | Combat Evolved</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&display=swap');
+        body, html { margin: 0; padding: 0; overflow: hidden; background: #050505; font-family: 'Rajdhani', sans-serif; color: white; }
+        canvas { display: block; z-index: 1; }
+        
+        .stats { position: fixed; top: 20px; left: 20px; z-index: 10; background: rgba(0,0,0,0.4); padding: 10px; border-left: 3px solid #8b0000; pointer-events: none; }
+        .ability-list { position: fixed; bottom: 40px; right: 40px; display: flex; flex-direction: column; gap: 5px; z-index: 10; pointer-events: none; }
+        .ability-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; transition: 0.3s; }
+        .ability-name { font-size: 14px; text-transform: uppercase; color: #ccc; }
+        .ability-icon { width: 22px; height: 22px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 10px; }
+        .controls-legend { position: fixed; top: 50%; right: 20px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 4px; z-index: 10; pointer-events: none; }
+        .control-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #777; }
+        .control-box { width: 12px; height: 12px; border: 1px solid #444; background: #111; }
+    </style>
+</head>
+<body>
+
+<div class="stats">
+    <div id="path-display" style="color: #8b0000; font-size: 10px; letter-spacing: 2px;">PATH: LOADING</div>
+    <div id="tech-display" style="font-size: 20px; font-weight: 700;">STANCE: UNARMED</div>
+</div>
+
+<div class="ability-list" id="ability-bar"></div>
+
+<div class="controls-legend">
+    <div class="control-item"><div class="control-box"></div> [M1] Punch / Uppercut</div>
+    <div class="control-item"><div class="control-box"></div> [F] Block</div>
+    <div class="control-item"><div class="control-box"></div> [Q] Dash</div>
+    <div class="control-item"><div class="control-box"></div> [1-4] Skills</div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// --- CAMERA / SHAKE ---
+let shakeTime = 0;
+let shakeIntensity = 0;
+
+function applyShake(amt, duration) {
+    shakeIntensity = amt;
+    shakeTime = duration;
+}
+
+// --- PARTICLES ---
+const particles = [];
+class Particle {
+    constructor(x, y, color, vx, vy, size, life) {
+        this.x = x; this.y = y; this.color = color;
+        this.vx = vx; this.vy = vy; this.size = size;
+        this.life = life; this.maxLife = life;
+    }
+    update() {
+        this.x += this.vx; this.y += this.vy;
+        this.vy += 0.2; // Gravity
+        this.life--;
+    }
+    draw() {
+        ctx.globalAlpha = this.life / this.maxLife;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.size, this.size);
+        ctx.globalAlpha = 1;
+    }
+}
+
+function spawnBurst(x, y, color, count, speed = 15) {
+    for(let i=0; i<count; i++) {
+        particles.push(new Particle(
+            x, y, color, 
+            (Math.random()-0.5)*speed, (Math.random()-0.5)*speed, 
+            Math.random()*6+2, Math.random()*40+20
+        ));
+    }
+}
+
+// --- GHOST TRAIL SYSTEM ---
+const ghosts = [];
+function addGhost(x, y, color) {
+    ghosts.push({ x, y, color, life: 1.0 });
+}
+
+// --- PLAYER & NPC ---
+const player = {
+    x: 100, y: 0, w: 40, h: 65, color: '#8b0000',
+    velX: 0, velY: 0, speed: 6, jumps: 0, dir: 1,
+    isDashing: false, dashCd: 0, isGrounded: false,
+    path: localStorage.getItem("playerPath") || "Rift Brawler",
+    tech: localStorage.getItem("playerTech") || "Fracture Punch"
+};
+
+const dummy = { x: 800, y: 0, w: 50, h: 80, hp: 1000, maxHp: 1000, velX: 0, velY: 0 };
+let activeHitbox = null;
+
+// --- ABILITIES ---
+const abilities = {
+    "Rift Brawler": [
+        { name: "Fracture Punch", cd: 3, current: 0, action: () => {
+            player.velX = player.dir * 30;
+            performAttack(100, 60, 50, player.dir * 25, -5, "red");
+            applyShake(10, 15);
+        }},
+        { name: "Crush Dash", cd: 8, current: 0, action: () => {
+            player.velX = player.dir * 50;
+            performAttack(120, 60, 80, player.dir * 30, 10, "orange");
+            applyShake(15, 20);
+        }},
+        { name: "Continental Impact", cd: 15, current: 0, action: () => {
+            player.velY = -35;
+            setTimeout(() => { 
+                player.velY = 60;
+                applyShake(25, 40);
+                spawnBurst(player.x, canvas.height-100, "yellow", 150, 30);
+                if(Math.abs(player.x - dummy.x) < 250) dummy.hp -= 200;
+            }, 400);
+        }},
+        { name: "World-Ender", cd: 40, current: 0, action: () => {
+            if(hitCheck(150)) {
+                let count = 0;
+                let intv = setInterval(() => {
+                    dummy.hp -= 8;
+                    spawnBurst(dummy.x + 25, dummy.y + 40, "red", 10);
+                    applyShake(5, 5);
+                    count++; if(count > 100) clearInterval(intv);
+                }, 30);
+            }
+        }}
+    ]
+};
+
+const myAbilities = abilities[player.path] || abilities["Rift Brawler"];
+
+// --- ATTACK LOGIC ---
+function performAttack(range, height, damage, kX, kY, pColor) {
+    let hitX = player.dir === 1 ? player.x + player.w : player.x - range;
+    activeHitbox = { x: hitX, y: player.y, w: range, h: height, color: pColor, life: 10 };
+    
+    if (hitCheck(range)) {
+        dummy.hp -= damage;
+        dummy.velX = kX;
+        dummy.velY = kY;
+        spawnBurst(dummy.x + 25, dummy.y + 40, pColor, 40);
+        applyShake(8, 10);
+    }
+}
+
+function hitCheck(range) {
+    let reach = player.dir === 1 ? player.x + player.w : player.x - range;
+    return reach < dummy.x + dummy.w && reach + range > dummy.x && player.y < dummy.y + dummy.h && player.y + player.h > dummy.y;
+}
+
+const keys = {};
+window.onkeydown = (e) => {
+    keys[e.key.toLowerCase()] = true;
+    if(['1','2','3','4'].includes(e.key)) {
+        let a = myAbilities[parseInt(e.key)-1];
+        if(a && a.current <= 0) { a.action(); a.current = a.cd; }
+    }
+    
+    // --- UPDATED DASH LOGIC ---
+    if(e.key === 'q' && player.dashCd <= 0) {
+        player.isDashing = true;
+        player.velX = player.dir * 45; // High speed forward
+        player.velY = 0; // Lock height for air dashing
+        player.dashCd = 50; // Reset Cooldown
+        applyShake(10, 15);
+        spawnBurst(player.x, player.y + 30, "white", 30);
+        
+        // Disable dashing state after a short burst
+        setTimeout(() => { player.isDashing = false; }, 150);
+    }
+
+    if(e.code === 'Space' && player.jumps < 2) { 
+        player.velY = -15; 
+        player.jumps++; 
+        player.isGrounded = false;
+        spawnBurst(player.x + 20, player.y + 60, "#333", 15, 5);
+    }
+};
+window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
+
+window.onmousedown = () => {
+    if (!player.isGrounded) {
+        player.velY = -12;
+        performAttack(70, 100, 25, player.dir * 5, -20, "#fff"); 
+        applyShake(12, 12);
+        spawnBurst(player.x + 20, player.y + 30, "cyan", 50, 20);
+    } else {
+        performAttack(70, 60, 15, player.dir * 10, -2, "white");
+    }
+};
+
+// --- CORE LOOP ---
+function update() {
+    let s = keys.shift ? player.speed * 1.8 : player.speed;
+    
+    // Dash overrides normal movement
+    if (player.isDashing) {
+        addGhost(player.x, player.y, player.color);
+    } else {
+        if(keys.a) { player.velX = -s; player.dir = -1; }
+        else if(keys.d) { player.velX = s; player.dir = 1; }
+        else { player.velX *= 0.8; }
+        player.velY += 0.8; // Gravity only applies when not dashing
+    }
+
+    player.x += player.velX; 
+    player.y += player.velY;
+    
+    dummy.velY += 0.8; dummy.x += dummy.velX; dummy.y += dummy.velY; dummy.velX *= 0.85;
+    if(player.dashCd > 0) player.dashCd--;
+
+    [player, dummy].forEach(e => {
+        if(e.y + e.h > canvas.height - 100) {
+            e.y = canvas.height - 100 - e.h;
+            e.velY = 0;
+            if(e === player) { player.jumps = 0; player.isGrounded = true; }
+        }
+    });
+
+    // Trail cleanup
+    for(let i = ghosts.length - 1; i >= 0; i--) {
+        ghosts[i].life -= 0.1;
+        if(ghosts[i].life <= 0) ghosts.splice(i, 1);
+    }
+
+    myAbilities.forEach((a, i) => { if(a.current > 0) a.current -= 1/60; document.getElementById(`row-${i}`).style.opacity = a.current > 0 ? "0.3" : "1"; });
+
+    for(let i=particles.length-1; i>=0; i--) { particles[i].update(); if(particles[i].life <= 0) particles.splice(i, 1); }
+
+    if (shakeTime > 0) shakeTime--; else shakeIntensity = 0;
+    if (activeHitbox && activeHitbox.life > 0) activeHitbox.life--;
+}
+
+function draw() {
+    ctx.save();
+    if (shakeTime > 0) {
+        ctx.translate(Math.random()*shakeIntensity - shakeIntensity/2, Math.random()*shakeIntensity - shakeIntensity/2);
+    }
+
+    ctx.clearRect(-100, -100, canvas.width+200, canvas.height+200);
+    
+    // Environment
+    ctx.fillStyle = "#111"; ctx.fillRect(0, canvas.height-100, canvas.width, 100);
+    
+    // Draw Ghost Trail
+    ghosts.forEach(g => {
+        ctx.globalAlpha = g.life * 0.4;
+        ctx.fillStyle = g.color;
+        ctx.fillRect(g.x, g.y, player.w, player.h);
+    });
+    ctx.globalAlpha = 1;
+
+    // Hitbox Visualizer
+    if (activeHitbox && activeHitbox.life > 0) {
+        ctx.strokeStyle = activeHitbox.color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(activeHitbox.x, activeHitbox.y, activeHitbox.w, activeHitbox.h);
+        ctx.fillStyle = activeHitbox.color;
+        ctx.globalAlpha = 0.1;
+        ctx.fillRect(activeHitbox.x, activeHitbox.y, activeHitbox.w, activeHitbox.h);
+        ctx.globalAlpha = 1;
+    }
+
+    // Characters
+    ctx.fillStyle = "#333"; ctx.fillRect(dummy.x, dummy.y, dummy.w, dummy.h);
+    ctx.fillStyle = "red"; ctx.fillRect(dummy.x, dummy.y-15, (dummy.hp/dummy.maxHp)*dummy.w, 6);
+
+    ctx.fillStyle = player.color; ctx.fillRect(player.x, player.y, player.w, player.h);
+    
+    particles.forEach(p => p.draw());
+    ctx.restore();
+
+    update();
+    requestAnimationFrame(draw);
+}
+
+function initUI() {
+    document.getElementById('path-display').innerText = "PATH: " + player.path.toUpperCase();
+    document.getElementById('tech-display').innerText = player.tech.toUpperCase();
+    const bar = document.getElementById('ability-bar');
+    myAbilities.forEach((a, i) => { bar.innerHTML += `<div class="ability-row" id="row-${i}"><div class="ability-name">${a.name}</div><div class="ability-icon">${i+1}</div></div>`; });
+}
+
+initUI(); draw();
+</script>
+</body>
+</html>

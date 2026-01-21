@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RESONACE | Hub</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@300;700&family=Rajdhani:wght@500;700&display=swap');
+
+        :root {
+            --common: #d1d1d1;
+            --rare: #3a86ff;
+            --epic: #a044ff;
+            --legendary: #ffbe0b;
+            --mythic: #ff0044;
+            --accent: #8b0000;
+            --gold: #ffd700;
+        }
+
+        * { box-sizing: border-box; }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background: #050505;
+            color: white;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+        }
+
+        /* --- FOGGY BACKGROUND --- */
+        .fog-container {
+            position: fixed;
+            width: 100%; height: 100%;
+            z-index: 1;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #050505 100%);
+        }
+
+        .fog {
+            position: absolute;
+            top: 0; left: 0; width: 200%; height: 100%;
+            background: url('https://raw.githubusercontent.com/AnandChowdhary/animations/master/fog.png');
+            background-repeat: repeat-x;
+            opacity: 0.15;
+            filter: blur(10px);
+        }
+        .fog-fast { animation: fogMove 40s linear infinite; }
+        .fog-slow { animation: fogMove 80s linear infinite; opacity: 0.1; }
+
+        @keyframes fogMove {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
+
+        /* --- MAIN MENU --- */
+        .main-ui {
+            position: relative;
+            z-index: 10;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 0 8%;
+            background: linear-gradient(90deg, rgba(0,0,0,0.9) 0%, transparent 50%);
+        }
+
+        /* UPDATED LOGO STYLING */
+        .logo-wrap {
+            position: absolute;
+            top: 50px; right: 80px;
+            text-align: center; /* Centered relative to its container */
+        }
+
+        .logo-img { 
+            width: 180px; /* Smaller size */
+            height: 180px;
+            object-fit: cover;
+            border-radius: 50%; /* Rounded edges */
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            filter: drop-shadow(0 0 20px rgba(255,255,255,0.2)); 
+            animation: breathe 4s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+        }
+
+        .event-text {
+            color: #4facfe;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.9rem; /* Slightly smaller to match logo */
+            letter-spacing: 2px;
+            margin-top: 10px;
+            text-shadow: 0 0 10px #4facfe;
+            text-transform: uppercase;
+        }
+
+        .menu-nav { display: flex; flex-direction: column; gap: 15px; }
+
+        .nav-btn {
+            background: none; border: none;
+            color: #555; font-size: 3rem;
+            font-weight: 700; text-align: left;
+            cursor: pointer; transition: 0.4s;
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+        }
+
+        .nav-btn:hover { color: white; transform: translateX(20px); text-shadow: 0 0 20px white; }
+        .btn-play { color: white; font-size: 5rem; border-bottom: 4px solid var(--accent); width: fit-content; }
+
+        /* --- SCREENS --- */
+        .screen {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.97);
+            z-index: 100;
+            display: none;
+            padding: 40px;
+        }
+
+        /* --- GACHA UI --- */
+        .rarity-legend {
+            position: absolute; top: 40px; right: 40px;
+            background: rgba(255,255,255,0.05);
+            padding: 15px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .legend-item { display: flex; justify-content: space-between; gap: 20px; font-size: 0.9rem; margin-bottom: 5px; }
+
+        .spin-inventory {
+            position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 20px;
+        }
+
+        .stat-box {
+            background: #111; padding: 10px 20px;
+            border-bottom: 2px solid var(--accent);
+            text-align: center;
+        }
+
+        .gacha-interface {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            height: 100%; gap: 30px;
+        }
+
+        .tech-card {
+            width: 450px; height: 280px;
+            background: linear-gradient(145deg, #111, #000);
+            border: 1px solid #333;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(0,0,0,1);
+            position: relative;
+            transition: 0.5s box-shadow;
+        }
+
+        .rarity-pill {
+            display: inline-block; padding: 4px 12px;
+            border-radius: 20px; font-size: 0.8rem;
+            font-weight: bold; margin-bottom: 10px;
+            background: #222;
+        }
+
+        .tech-desc { color: #888; font-size: 1rem; margin-top: 15px; line-height: 1.4; }
+
+        .btn-group { display: flex; gap: 15px; }
+
+        .spin-btn {
+            background: var(--accent); color: white;
+            border: none; padding: 15px 30px;
+            font-size: 1rem; font-weight: bold;
+            cursor: pointer; border-radius: 5px;
+            transition: 0.3s;
+            text-transform: uppercase;
+        }
+
+        .btn-legendary { background: var(--gold); color: black; }
+        .spin-btn:hover:not(:disabled) { transform: translateY(-5px); opacity: 0.8; }
+        .spin-btn:disabled { background: #333; cursor: not-allowed; }
+
+        .notif {
+            position: fixed; bottom: 40px; left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent); color: white;
+            padding: 15px 40px; border-radius: 4px;
+            font-weight: bold; display: none; z-index: 1000;
+        }
+
+        .back-link {
+            position: absolute; top: 40px; left: 40px;
+            color: white; text-decoration: none; font-size: 1.5rem;
+            cursor: pointer; opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="fog-container">
+        <div class="fog fog-fast"></div>
+        <div class="fog fog-slow"></div>
+    </div>
+
+    <div class="main-ui">
+        <div class="logo-wrap">
+            <img src="RESONACE.png" alt="Logo" class="logo-img">
+            <div class="event-text">Winter Event</div>
+        </div>
+
+        <nav class="menu-nav">
+            <button class="nav-btn btn-play" onclick="tryPlay()">Play</button>
+            <button class="nav-btn" onclick="openScreen('gacha-screen')">Customize</button>
+            <button class="nav-btn">Slots</button>
+            <button class="nav-btn" onclick="openScreen('credits-screen')">Credits</button>
+            <button class="nav-btn">AFK</button>
+        </nav>
+    </div>
+
+    <div id="gacha-screen" class="screen">
+        <div class="back-link" onclick="closeScreens()">← BACK TO MENU</div>
+        
+        <div class="spin-inventory">
+            <div class="stat-box">
+                <div style="font-size: 0.7rem; color: #888;">REGULAR SPINS</div>
+                <div id="reg-count" style="font-size: 1.5rem; font-weight: bold;">25</div>
+            </div>
+            <div class="stat-box" style="border-color: var(--gold);">
+                <div style="font-size: 0.7rem; color: #888;">LEGENDARY SPINS</div>
+                <div id="leg-count" style="font-size: 1.5rem; font-weight: bold;">25</div>
+            </div>
+        </div>
+
+        <div class="rarity-legend">
+            <div class="legend-item"><span>Mythic</span> <span style="color:var(--mythic)">0.1%</span></div>
+            <div class="legend-item"><span>Legendary</span> <span style="color:var(--legendary)">1%</span></div>
+            <div class="legend-item"><span>Epic</span> <span style="color:var(--epic)">10%</span></div>
+            <div class="legend-item"><span>Rare</span> <span style="color:var(--rare)">25%</span></div>
+        </div>
+
+        <div class="gacha-interface">
+            <div class="tech-card" id="tech-card">
+                <div id="card-rarity-pill" class="rarity-pill">EMPTY</div>
+                <h1 id="card-name" style="margin: 5px 0; font-size: 2.5rem;">NONE</h1>
+                <div id="card-path" style="color: #555; font-size: 0.9rem;">RESONANCE REQUIRED</div>
+                <p id="card-desc" class="tech-desc">Your journey has not yet begun. Choose a spin type to manifest your technique.</p>
+            </div>
+            
+            <div class="btn-group">
+                <button id="btn-reg" class="spin-btn" onclick="spin('regular')">Regular Spin</button>
+                <button id="btn-leg" class="spin-btn btn-legendary" onclick="spin('legendary')">Legendary Spin</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="credits-screen" class="screen">
+        <div class="back-link" onclick="closeScreens()">← BACK</div>
+        <div class="gacha-interface">
+            <h1 style="font-size: 4rem; margin-bottom: 0;">RESONACE</h1>
+            <p style="font-size: 1.5rem; color: #888;">Lead Developer: <strong>Ruben</strong></p>
+            <p style="font-size: 1.5rem; color: #888;">Lead Designer: <strong>Ruben</strong></p>
+        </div>
+    </div>
+
+    <div id="notif-box" class="notif">UNARMED: SPIN IN CUSTOMIZE FIRST!</div>
+
+    <script>
+        let currentTech = null;
+        let spins = { regular: 25, legendary: 25 };
+
+        const techniques = [
+            { name: "Fracture Punch", path: "Rift Brawler", rarity: "Common", weight: 60, color: "var(--common)", desc: "A heavy straight lead that sends a small shockwave forward." },
+            { name: "Crush Dash", path: "Rift Brawler", rarity: "Rare", weight: 25, color: "var(--rare)", desc: "A fast lunge that grabs the first enemy hit and slams them into the ground." },
+            { name: "Continental Impact", path: "Rift Brawler", rarity: "Legendary", weight: 1, color: "var(--legendary)", desc: "High-altitude leap and crash that creates a permanent Fractured debuff zone." },
+            { name: "World-Ender’s Embrace", path: "Rift Brawler", rarity: "Mythic", weight: 0.1, color: "var(--mythic)", desc: "A cutscene-style grab pulls target into a sub-dimension for a 100-hit flurry." },
+            { name: "Void Bolt", path: "Void Manifestor", rarity: "Common", weight: 60, color: "var(--common)", desc: "Fast-firing projectile with slight homing capabilities." },
+            { name: "Collapse Sphere", path: "Void Manifestor", rarity: "Rare", weight: 25, color: "var(--rare)", desc: "A gravity orb that pulls enemies toward its center for 3 seconds." },
+            { name: "Supernova Protocol", path: "Void Manifestor", rarity: "Mythic", weight: 0.1, color: "var(--mythic)", desc: "Become a collapsing star, pulling everyone in before a screen-clearing blast." },
+            { name: "Blade Works", path: "Weaponbound", rarity: "Legendary", weight: 1, color: "var(--legendary)", desc: "Summons 50 swords that fire automatically whenever you attack." },
+            { name: "God-Slaying Slash", path: "Weaponbound", rarity: "Mythic", weight: 0.1, color: "var(--mythic)", desc: "A single horizontal cut that ignores all armor and shields." }
+        ];
+
+        function openScreen(id) { document.getElementById(id).style.display = 'block'; }
+        function closeScreens() { document.querySelectorAll('.screen').forEach(s => s.style.display = 'none'); }
+
+        function tryPlay() {
+            if (!currentTech) {
+                const nb = document.getElementById('notif-box');
+                nb.style.display = 'block';
+                setTimeout(() => nb.style.display = 'none', 3000);
+            } else {
+                window.location.href = "game.html";
+            }
+        }
+
+        function spin(type) {
+            if (spins[type] <= 0) return alert("No spins remaining!");
+            spins[type]--;
+            updateSpinUI();
+            
+            const btnReg = document.getElementById('btn-reg');
+            const btnLeg = document.getElementById('btn-leg');
+            btnReg.disabled = true; btnLeg.disabled = true;
+
+            let rolls = 0;
+            const interval = setInterval(() => {
+                updateCard(techniques[Math.floor(Math.random() * techniques.length)]);
+                rolls++;
+                if (rolls > 12) {
+                    clearInterval(interval);
+                    finalizeSpin(type);
+                    btnReg.disabled = false; btnLeg.disabled = false;
+                }
+            }, 80);
+        }
+
+        function finalizeSpin(type) {
+            let pool = (type === 'legendary') ? techniques.filter(t => t.rarity !== 'Common') : techniques;
+            const totalWeight = pool.reduce((acc, t) => acc + t.weight, 0);
+            let random = Math.random() * totalWeight;
+            
+            for (let t of pool) {
+                if (random < t.weight) {
+                    currentTech = t;
+                    break;
+                }
+                random -= t.weight;
+            }
+            updateCard(currentTech);
+            document.getElementById('tech-card').style.boxShadow = `0 0 60px ${currentTech.color}`;
+        }
+
+        function updateCard(tech) {
+            document.getElementById('card-name').innerText = tech.name.toUpperCase();
+            document.getElementById('card-name').style.color = tech.color;
+            document.getElementById('card-path').innerText = tech.path.toUpperCase();
+            document.getElementById('card-rarity-pill').innerText = tech.rarity;
+            document.getElementById('card-rarity-pill').style.backgroundColor = tech.color;
+            document.getElementById('card-rarity-pill').style.color = (tech.rarity === 'Common' || tech.rarity === 'Legendary') ? 'black' : 'white';
+            document.getElementById('card-desc').innerText = tech.desc;
+        }
+
+        function updateSpinUI() {
+            document.getElementById('reg-count').innerText = spins.regular;
+            document.getElementById('leg-count').innerText = spins.legendary;
+        }
+    </script>
+</body>
+</html>
