@@ -43,6 +43,7 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+// --- CAMERA / SHAKE ---
 let shakeTime = 0;
 let shakeIntensity = 0;
 
@@ -51,6 +52,7 @@ function applyShake(amt, duration) {
     shakeTime = duration;
 }
 
+// --- PARTICLES ---
 const particles = [];
 class Particle {
     constructor(x, y, color, vx, vy, size, life) {
@@ -60,7 +62,7 @@ class Particle {
     }
     update() {
         this.x += this.vx; this.y += this.vy;
-        this.vy += 0.2;
+        this.vy += 0.2; // Gravity
         this.life--;
     }
     draw() {
@@ -81,11 +83,13 @@ function spawnBurst(x, y, color, count, speed = 15) {
     }
 }
 
+// --- GHOST TRAIL SYSTEM ---
 const ghosts = [];
 function addGhost(x, y, color) {
     ghosts.push({ x, y, color, life: 1.0 });
 }
 
+// --- PLAYER & NPC ---
 const player = {
     x: 100, y: 0, w: 40, h: 65, color: '#8b0000',
     velX: 0, velY: 0, speed: 6, jumps: 0, dir: 1,
@@ -97,70 +101,49 @@ const player = {
 const dummy = { x: 800, y: 0, w: 50, h: 80, hp: 1000, maxHp: 1000, velX: 0, velY: 0 };
 let activeHitbox = null;
 
-// --- DYNAMIC ABILITY DATABASE ---
-const abilityData = {
-    "Fracture Punch": [
-        { name: "Shock Fist", cd: 3, action: () => { player.velX = player.dir * 20; performAttack(100, 60, 40, player.dir * 20, -5, "red"); }},
-        { name: "Bone Rattle", cd: 5, action: () => { performAttack(80, 60, 60, player.dir * 5, -2, "gray"); }},
-        { name: "Aftershock", cd: 8, action: () => { spawnBurst(player.x + (player.dir*50), player.y, "orange", 20); }},
-        { name: "Cracked Guard", cd: 10, action: () => { performAttack(120, 40, 30, 0, 0, "white"); }}
-    ],
-    "Crush Dash": [
-        { name: "Rift Lunge", cd: 6, action: () => { player.velX = player.dir * 40; }},
-        { name: "Groundbreaker", cd: 10, action: () => { performAttack(100, 100, 80, 0, 10, "orange"); }},
-        { name: "Momentum", cd: 12, action: () => { player.velX = player.dir * 60; }},
-        { name: "Seismic Throw", cd: 15, action: () => { dummy.velY = -30; }}
-    ],
-    "Continental Impact": [
-        { name: "Skybound", cd: 12, action: () => { player.velY = -40; }},
-        { name: "Planetfall", cd: 20, action: () => { player.velY = 60; applyShake(20, 30); }},
-        { name: "Fractured Zone", cd: 25, action: () => { spawnBurst(player.x, canvas.height-100, "yellow", 100); }},
-        { name: "Tectonic", cd: 30, action: () => { dummy.velX = 0; }}
-    ],
-    "World-Ender’s Embrace": [
-        { name: "Dim. Grasp", cd: 15, action: () => { performAttack(150, 80, 50, 0, 0, "purple"); }},
-        { name: "Subspace Drag", cd: 25, action: () => { dummy.x = -1000; setTimeout(() => dummy.x = 800, 2000); }},
-        { name: "100-Flurry", cd: 45, action: () => { applyShake(30, 100); dummy.hp -= 400; }},
-        { name: "Collapse", cd: 60, action: () => { if(dummy.hp < 300) dummy.hp = 0; }}
-    ],
-    "Void Bolt": [
-        { name: "Void Shot", cd: 2, action: () => { performAttack(400, 20, 20, player.dir*2, 0, "magenta"); }},
-        { name: "Homing Drift", cd: 4, action: () => { /* Logic */ }},
-        { name: "Entropy Burn", cd: 10, action: () => { dummy.hp -= 50; }},
-        { name: "Overcharge", cd: 12, action: () => { performAttack(500, 40, 80, 0, 0, "white"); }}
-    ],
-    "Collapse Sphere": [
-        { name: "Gravity Orb", cd: 8, action: () => { dummy.x = player.x + (player.dir*100); }},
-        { name: "Compression", cd: 12, action: () => { dummy.hp -= 100; }},
-        { name: "Detonation", cd: 15, action: () => { spawnBurst(dummy.x, dummy.y, "purple", 50); }},
-        { name: "Grav. Lock", cd: 20, action: () => { dummy.velX = 0; }}
-    ],
-    "Supernova Protocol": [
-        { name: "Stellar Core", cd: 20, action: () => { player.color = "white"; }},
-        { name: "Event Horizon", cd: 25, action: () => { dummy.x = player.x; }},
-        { name: "Radiant Charge", cd: 30, action: () => { applyShake(10, 50); }},
-        { name: "Supernova", cd: 80, action: () => { spawnBurst(player.x, player.y, "cyan", 300, 50); dummy.hp = 0; }}
-    ],
-    "Blade Works": [
-        { name: "Armory", cd: 15, action: () => { spawnBurst(player.x, player.y-100, "silver", 50); }},
-        { name: "Auto Barrage", cd: 5, action: () => { performAttack(300, 200, 50, 0, 0, "white"); }},
-        { name: "Blade Recall", cd: 12, action: () => { applyShake(5, 10); }},
-        { name: "Synchrony", cd: 20, action: () => { player.speed = 12; }}
-    ],
-    "God-Slaying Slash": [
-        { name: "Abs. Draw", cd: 10, action: () => { player.velX = 0; }},
-        { name: "Heaven-Cleave", cd: 25, action: () => { performAttack(600, 20, 300, player.dir*50, -10, "white"); }},
-        { name: "Judgement", cd: 30, action: () => { spawnBurst(player.x + 200, player.y, "red", 20); }},
-        { name: "Divinity", cd: 40, action: () => { dummy.hp -= 200; }}
+// --- ABILITIES ---
+const abilities = {
+    "Rift Brawler": [
+        { name: "Fracture Punch", cd: 3, current: 0, action: () => {
+            player.velX = player.dir * 30;
+            performAttack(100, 60, 50, player.dir * 25, -5, "red");
+            applyShake(10, 15);
+        }},
+        { name: "Crush Dash", cd: 8, current: 0, action: () => {
+            player.velX = player.dir * 50;
+            performAttack(120, 60, 80, player.dir * 30, 10, "orange");
+            applyShake(15, 20);
+        }},
+        { name: "Continental Impact", cd: 15, current: 0, action: () => {
+            player.velY = -35;
+            setTimeout(() => { 
+                player.velY = 60;
+                applyShake(25, 40);
+                spawnBurst(player.x, canvas.height-100, "yellow", 150, 30);
+                if(Math.abs(player.x - dummy.x) < 250) dummy.hp -= 200;
+            }, 400);
+        }},
+        { name: "World-Ender", cd: 40, current: 0, action: () => {
+            if(hitCheck(150)) {
+                let count = 0;
+                let intv = setInterval(() => {
+                    dummy.hp -= 8;
+                    spawnBurst(dummy.x + 25, dummy.y + 40, "red", 10);
+                    applyShake(5, 5);
+                    count++; if(count > 100) clearInterval(intv);
+                }, 30);
+            }
+        }}
     ]
 };
 
-// Map the tech to the ability list
-const myAbilities = (abilityData[player.tech] || abilityData["Fracture Punch"]).map(a => ({...a, current: 0}));
+const myAbilities = abilities[player.path] || abilities["Rift Brawler"];
 
+// --- ATTACK LOGIC ---
 function performAttack(range, height, damage, kX, kY, pColor) {
     let hitX = player.dir === 1 ? player.x + player.w : player.x - range;
     activeHitbox = { x: hitX, y: player.y, w: range, h: height, color: pColor, life: 10 };
+    
     if (hitCheck(range)) {
         dummy.hp -= damage;
         dummy.velX = kX;
@@ -182,17 +165,25 @@ window.onkeydown = (e) => {
         let a = myAbilities[parseInt(e.key)-1];
         if(a && a.current <= 0) { a.action(); a.current = a.cd; }
     }
+    
+    // --- UPDATED DASH LOGIC ---
     if(e.key === 'q' && player.dashCd <= 0) {
         player.isDashing = true;
-        player.velX = player.dir * 45;
-        player.dashCd = 50;
+        player.velX = player.dir * 45; // High speed forward
+        player.velY = 0; // Lock height for air dashing
+        player.dashCd = 50; // Reset Cooldown
         applyShake(10, 15);
+        spawnBurst(player.x, player.y + 30, "white", 30);
+        
+        // Disable dashing state after a short burst
         setTimeout(() => { player.isDashing = false; }, 150);
     }
+
     if(e.code === 'Space' && player.jumps < 2) { 
         player.velY = -15; 
         player.jumps++; 
         player.isGrounded = false;
+        spawnBurst(player.x + 20, player.y + 60, "#333", 15, 5);
     }
 };
 window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
@@ -201,25 +192,33 @@ window.onmousedown = () => {
     if (!player.isGrounded) {
         player.velY = -12;
         performAttack(70, 100, 25, player.dir * 5, -20, "#fff"); 
+        applyShake(12, 12);
+        spawnBurst(player.x + 20, player.y + 30, "cyan", 50, 20);
     } else {
         performAttack(70, 60, 15, player.dir * 10, -2, "white");
     }
 };
 
+// --- CORE LOOP ---
 function update() {
     let s = keys.shift ? player.speed * 1.8 : player.speed;
+    
+    // Dash overrides normal movement
     if (player.isDashing) {
         addGhost(player.x, player.y, player.color);
     } else {
         if(keys.a) { player.velX = -s; player.dir = -1; }
         else if(keys.d) { player.velX = s; player.dir = 1; }
         else { player.velX *= 0.8; }
-        player.velY += 0.8;
+        player.velY += 0.8; // Gravity only applies when not dashing
     }
+
     player.x += player.velX; 
     player.y += player.velY;
+    
     dummy.velY += 0.8; dummy.x += dummy.velX; dummy.y += dummy.velY; dummy.velX *= 0.85;
     if(player.dashCd > 0) player.dashCd--;
+
     [player, dummy].forEach(e => {
         if(e.y + e.h > canvas.height - 100) {
             e.y = canvas.height - 100 - e.h;
@@ -227,39 +226,60 @@ function update() {
             if(e === player) { player.jumps = 0; player.isGrounded = true; }
         }
     });
+
+    // Trail cleanup
     for(let i = ghosts.length - 1; i >= 0; i--) {
         ghosts[i].life -= 0.1;
         if(ghosts[i].life <= 0) ghosts.splice(i, 1);
     }
-    myAbilities.forEach((a, i) => { 
-        if(a.current > 0) a.current -= 1/60; 
-        document.getElementById(`row-${i}`).style.opacity = a.current > 0 ? "0.3" : "1"; 
-    });
+
+    myAbilities.forEach((a, i) => { if(a.current > 0) a.current -= 1/60; document.getElementById(`row-${i}`).style.opacity = a.current > 0 ? "0.3" : "1"; });
+
     for(let i=particles.length-1; i>=0; i--) { particles[i].update(); if(particles[i].life <= 0) particles.splice(i, 1); }
+
     if (shakeTime > 0) shakeTime--; else shakeIntensity = 0;
     if (activeHitbox && activeHitbox.life > 0) activeHitbox.life--;
 }
 
 function draw() {
     ctx.save();
-    if (shakeTime > 0) ctx.translate(Math.random()*shakeIntensity - shakeIntensity/2, Math.random()*shakeIntensity - shakeIntensity/2);
+    if (shakeTime > 0) {
+        ctx.translate(Math.random()*shakeIntensity - shakeIntensity/2, Math.random()*shakeIntensity - shakeIntensity/2);
+    }
+
     ctx.clearRect(-100, -100, canvas.width+200, canvas.height+200);
+    
+    // Environment
     ctx.fillStyle = "#111"; ctx.fillRect(0, canvas.height-100, canvas.width, 100);
+    
+    // Draw Ghost Trail
     ghosts.forEach(g => {
         ctx.globalAlpha = g.life * 0.4;
         ctx.fillStyle = g.color;
         ctx.fillRect(g.x, g.y, player.w, player.h);
     });
     ctx.globalAlpha = 1;
+
+    // Hitbox Visualizer
     if (activeHitbox && activeHitbox.life > 0) {
         ctx.strokeStyle = activeHitbox.color;
+        ctx.lineWidth = 2;
         ctx.strokeRect(activeHitbox.x, activeHitbox.y, activeHitbox.w, activeHitbox.h);
+        ctx.fillStyle = activeHitbox.color;
+        ctx.globalAlpha = 0.1;
+        ctx.fillRect(activeHitbox.x, activeHitbox.y, activeHitbox.w, activeHitbox.h);
+        ctx.globalAlpha = 1;
     }
+
+    // Characters
     ctx.fillStyle = "#333"; ctx.fillRect(dummy.x, dummy.y, dummy.w, dummy.h);
     ctx.fillStyle = "red"; ctx.fillRect(dummy.x, dummy.y-15, (dummy.hp/dummy.maxHp)*dummy.w, 6);
+
     ctx.fillStyle = player.color; ctx.fillRect(player.x, player.y, player.w, player.h);
+    
     particles.forEach(p => p.draw());
     ctx.restore();
+
     update();
     requestAnimationFrame(draw);
 }
@@ -268,7 +288,6 @@ function initUI() {
     document.getElementById('path-display').innerText = "PATH: " + player.path.toUpperCase();
     document.getElementById('tech-display').innerText = player.tech.toUpperCase();
     const bar = document.getElementById('ability-bar');
-    bar.innerHTML = "";
     myAbilities.forEach((a, i) => { bar.innerHTML += `<div class="ability-row" id="row-${i}"><div class="ability-name">${a.name}</div><div class="ability-icon">${i+1}</div></div>`; });
 }
 
