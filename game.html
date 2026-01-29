@@ -10,10 +10,11 @@
         canvas { display: block; z-index: 1; }
         
         .stats { position: fixed; top: 20px; left: 20px; z-index: 10; background: rgba(0,0,0,0.4); padding: 10px; border-left: 3px solid #8b0000; pointer-events: none; }
-        .ability-list { position: fixed; bottom: 40px; right: 40px; display: flex; flex-direction: column; gap: 5px; z-index: 10; pointer-events: none; }
-        .ability-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; transition: 0.3s; }
+        .ability-list { position: fixed; bottom: 40px; right: 40px; display: flex; flex-direction: column; gap: 8px; z-index: 10; pointer-events: none; width: 320px; }
+        .ability-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; transition: 0.3s; background: rgba(0,0,0,0.4); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04); }
         .ability-name { font-size: 14px; text-transform: uppercase; color: #ccc; }
-        .ability-icon { width: 22px; height: 22px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 10px; }
+        .ability-desc { font-size: 11px; color: #999; max-width: 200px; text-align: right; }
+        .ability-key { font-size: 12px; color: #fff; background: #222; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
         .controls-legend { position: fixed; top: 50%; right: 20px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 4px; z-index: 10; pointer-events: none; }
         .control-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #777; }
         .control-box { width: 12px; height: 12px; border: 1px solid #444; background: #111; }
@@ -66,7 +67,7 @@ class Particle {
         this.life--;
     }
     draw() {
-        ctx.globalAlpha = this.life / this.maxLife;
+        ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x, this.y, this.size, this.size);
         ctx.globalAlpha = 1;
@@ -101,45 +102,7 @@ const player = {
 const dummy = { x: 800, y: 0, w: 50, h: 80, hp: 1000, maxHp: 1000, velX: 0, velY: 0 };
 let activeHitbox = null;
 
-// --- ABILITIES ---
-const abilities = {
-    "Rift Brawler": [
-        { name: "Fracture Punch", cd: 3, current: 0, action: () => {
-            player.velX = player.dir * 30;
-            performAttack(100, 60, 50, player.dir * 25, -5, "red");
-            applyShake(10, 15);
-        }},
-        { name: "Crush Dash", cd: 8, current: 0, action: () => {
-            player.velX = player.dir * 50;
-            performAttack(120, 60, 80, player.dir * 30, 10, "orange");
-            applyShake(15, 20);
-        }},
-        { name: "Continental Impact", cd: 15, current: 0, action: () => {
-            player.velY = -35;
-            setTimeout(() => { 
-                player.velY = 60;
-                applyShake(25, 40);
-                spawnBurst(player.x, canvas.height-100, "yellow", 150, 30);
-                if(Math.abs(player.x - dummy.x) < 250) dummy.hp -= 200;
-            }, 400);
-        }},
-        { name: "World-Ender", cd: 40, current: 0, action: () => {
-            if(hitCheck(150)) {
-                let count = 0;
-                let intv = setInterval(() => {
-                    dummy.hp -= 8;
-                    spawnBurst(dummy.x + 25, dummy.y + 40, "red", 10);
-                    applyShake(5, 5);
-                    count++; if(count > 100) clearInterval(intv);
-                }, 30);
-            }
-        }}
-    ]
-};
-
-const myAbilities = abilities[player.path] || abilities["Rift Brawler"];
-
-// --- ATTACK LOGIC ---
+// --- CORE ATTACK LOGIC (used by abilities) ---
 function performAttack(range, height, damage, kX, kY, pColor) {
     let hitX = player.dir === 1 ? player.x + player.w : player.x - range;
     activeHitbox = { x: hitX, y: player.y, w: range, h: height, color: pColor, life: 10 };
@@ -158,27 +121,233 @@ function hitCheck(range) {
     return reach < dummy.x + dummy.w && reach + range > dummy.x && player.y < dummy.y + dummy.h && player.y + player.h > dummy.y;
 }
 
+// --- ABILITY DATA: map technique -> 4 abilities ---
+const abilitiesByTechnique = {
+    // Rift Brawler
+    "Fracture Punch": [
+        { name: "Fracture Punch", cd: 3, current: 0, desc: "Heavy shockwave strike.", action: () => { performAttack(100, 60, 50, player.dir*25, -5, "red"); applyShake(10,12); } },
+        { name: "Void Echo", cd: 6, current: 0, desc: "Short-range ripple.", action: () => { performAttack(80, 60, 35, player.dir*15, -3, "#aa0000"); spawnBurst(player.x+20, player.y+30, "#ff6666", 20, 8); } },
+        { name: "Iron Guard", cd: 8, current: 0, desc: "Short guard window.", action: () => { spawnBurst(player.x+20, player.y+10, "#333", 8, 2); applyShake(4,6); } },
+        { name: "Breaker Step", cd: 5, current: 0, desc: "Short dash-through.", action: () => { player.velX = player.dir * 30; addGhost(player.x, player.y, player.color); applyShake(8,8); } }
+    ],
+    "Crush Dash": [
+        { name: "Rift Lunge", cd: 4, current: 0, desc: "Dash forward and grab first enemy hit.", action: () => {
+            player.velX = player.dir * 45;
+            // On hit: small damage + grab simulated by strong knock
+            if (hitCheck(140)) { dummy.hp -= 80; dummy.velY = -10; spawnBurst(dummy.x+20, dummy.y+20, "orange", 30); }
+            applyShake(12,12);
+        }},
+        { name: "Groundbreaker Slam", cd: 10, current: 0, desc: "Slam grabbed enemy into ground for AoE.", action: () => {
+            // if near dummy, huge area damage
+            if (Math.abs(player.x - dummy.x) < 200) { dummy.hp -= 140; spawnBurst(dummy.x, canvas.height-100, "yellow", 80, 25); applyShake(20,25); }
+        }},
+        { name: "Momentum Carry", cd: 0, current: 0, desc: "Dash distance increases after grab (passive simulated).", action: () => {
+            // small dash with bonus distance
+            player.velX = player.dir * 60; applyShake(8,10); addGhost(player.x, player.y, "#ffcc99");
+        }},
+        { name: "Seismic Throw", cd: 12, current: 0, desc: "Slam creates small knock-up shockwave.", action: () => {
+            if (Math.abs(player.x - dummy.x) < 250) { dummy.hp -= 100; dummy.velY = -18; spawnBurst(dummy.x, dummy.y, "brown", 60, 18); applyShake(18,20); }
+        }}
+    ],
+    "Continental Impact": [
+        { name: "Skybound Leap", cd: 6, current: 0, desc: "Launch high, briefly untargetable.", action: () => {
+            player.velY = -40; // go up
+            // brief untargetable simulated by ghost and no collisions for brief time
+            addGhost(player.x, player.y, "white");
+            setTimeout(()=>{ applyShake(6,10); }, 800);
+        }},
+        { name: "Planetfall", cd: 14, current: 0, desc: "Crash down, massive AoE.", action: () => {
+            // big slam after short delay
+            player.velY = -25;
+            setTimeout(()=> {
+                applyShake(30,40);
+                spawnBurst(player.x, canvas.height-120, "yellow", 160, 30);
+                if (Math.abs(player.x - dummy.x) < 300) dummy.hp -= 220;
+            }, 500);
+        }},
+        { name: "Fractured Zone", cd: 20, current: 0, desc: "Create permanent fractured terrain zone.", action: () => {
+            // simulate by spawning persistent particles and applying damage when dummy inside
+            zones.push({ x: player.x, y: canvas.height-140, r: 220, life: 999999 });
+            applyShake(10,12);
+        }},
+        { name: "Tectonic Pressure", cd: 8, current: 0, desc: "Slow and increase damage in zone.", action: () => {
+            // applies a temporary debuff if dummy in zone
+            zones.push({ x: player.x, y: canvas.height-140, r: 160, life: 180, type:"pressure" });
+            applyShake(6,8);
+        }}
+    ],
+    "World-Ender’s Embrace": [
+        { name: "Dimensional Grasp", cd: 30, current: 0, desc: "Grab a target ignoring resistances.", action: () => {
+            if (hitCheck(200)) { dummy.hp -= 400; spawnBurst(dummy.x, dummy.y, "#880000", 120, 20); applyShake(30,40); }
+        }},
+        { name: "Subspace Drag", cd: 40, current: 0, desc: "Pull target into a sealed sub-dimension.", action: () => {
+            if (hitCheck(150)) {
+                // long cinematic simulated damage over time
+                let count=0;
+                let iv=setInterval(()=>{ dummy.hp -= 12; spawnBurst(dummy.x+20,dummy.y+20,"#aa00aa",8,8); count++; if(count>50) clearInterval(iv); }, 40);
+                applyShake(18,40);
+            }
+        }},
+        { name: "Annihilation Flurry", cd: 60, current: 0, desc: "100-hit cinematic combo.", action: () => {
+            if (hitCheck(180)) {
+                let hits=0;
+                let iv=setInterval(()=>{ dummy.hp -= 10; spawnBurst(dummy.x+20,dummy.y+20,"#ff4444",6,6); hits++; if(hits>=100) clearInterval(iv); }, 25);
+                applyShake(25,60);
+            }
+        }},
+        { name: "Existential Collapse", cd: 90, current: 0, desc: "Execute or massively reduce stats.", action: () => {
+            if (hitCheck(160)) {
+                if (dummy.hp < 200) { dummy.hp = 0; } else { dummy.hp = Math.floor(dummy.hp*0.2); }
+                spawnBurst(dummy.x, dummy.y, "#440044", 200, 30);
+                applyShake(40,80);
+            }
+        }}
+    ],
+
+    // Void Manifestor
+    "Void Bolt": [
+        { name: "Void Shot", cd: 1.2, current: 0, desc: "Rapid-fire void projectile.", action: () => {
+            // simulate projectile as small bursts near dummy
+            spawnBurst(player.x+60, player.y+20, "#66ccff", 8, 10);
+            if (hitCheck(500)) dummy.hp -= 18;
+        }},
+        { name: "Homing Drift", cd: 4, current: 0, desc: "Projectiles slightly home to enemies.", action: () => {
+            spawnBurst(player.x+60, player.y+20, "#88ddff", 14, 12);
+            if (hitCheck(500)) dummy.hp -= 45;
+        }},
+        { name: "Entropy Burn", cd: 8, current: 0, desc: "Minor DoT.", action: () => {
+            // apply damage over time
+            let ticks=0; let iv=setInterval(()=>{ if (ticks++>6) clearInterval(iv); else if (hitCheck(500)) dummy.hp -= 8; }, 500);
+            spawnBurst(dummy.x, dummy.y, "#9966ff", 30, 12);
+        }},
+        { name: "Overcharge", cd: 6, current: 0, desc: "Hold to increase projectile power (burst).", action: () => {
+            spawnBurst(player.x+40, player.y+20, "#ffffff", 40, 18);
+            if (hitCheck(500)) dummy.hp -= 100;
+            applyShake(10,12);
+        }}
+    ],
+    "Collapse Sphere": [
+        { name: "Gravity Orb", cd: 10, current: 0, desc: "Deploy sphere that pulls enemies.", action: () => {
+            zones.push({ x: player.x+120, y: player.y+20, r: 180, life: 180, type: "pull" });
+            spawnBurst(player.x+120, player.y+20, "#66aaff", 60, 12);
+        }},
+        { name: "Mass Compression", cd: 12, current: 0, desc: "More damage near center.", action: () => {
+            if (Math.abs(dummy.x - (player.x+120)) < 100) dummy.hp -= 140;
+            spawnBurst(player.x+120, player.y+20, "#0044ff", 80, 20);
+        }},
+        { name: "Orb Detonation", cd: 16, current: 0, desc: "Sphere explodes at end.", action: () => {
+            spawnBurst(player.x+120, player.y+20, "#88ccff", 200, 28);
+            if (Math.abs(dummy.x - (player.x+120)) < 260) dummy.hp -= 220;
+            applyShake(20,28);
+        }},
+        { name: "Gravitic Lock", cd: 14, current: 0, desc: "Brief root in core.", action: () => {
+            zones.push({ x: player.x+120, y: player.y+20, r: 80, life: 60, type: "root" });
+            spawnBurst(player.x+120, player.y+20, "#3366ff", 40, 10);
+        }}
+    ],
+    "Supernova Protocol": [
+        { name: "Stellar Core", cd: 20, current: 0, desc: "Transform into dense gravitational star.", action: () => {
+            addGhost(player.x, player.y, "#ffff66");
+            applyShake(18,22);
+        }},
+        { name: "Event Horizon", cd: 22, current: 0, desc: "Strong pull draws nearby entities.", action: () => {
+            zones.push({ x: player.x, y: player.y, r: 380, life: 90, type: "pull-strong" });
+            applyShake(20,24);
+        }},
+        { name: "Radiant Collapse", cd: 28, current: 0, desc: "Charge reaches critical mass.", action: () => {
+            spawnBurst(player.x, player.y, "#ffdd66", 200, 28);
+            if (Math.abs(player.x - dummy.x) < 420) dummy.hp -= 300;
+        }},
+        { name: "Supernova Detonation", cd: 40, current: 0, desc: "Screen-clearing massive damage.", action: () => {
+            spawnBurst(canvas.width/2, canvas.height/2, "#ffffff", 600, 50);
+            dummy.hp = Math.max(0, dummy.hp - 800);
+            applyShake(60,120);
+        }}
+    ],
+
+    // Weaponbound
+    "Blade Works": [
+        { name: "Armory Manifest", cd: 18, current: 0, desc: "Summon 50 floating swords.", action: () => {
+            swords = 50; spawnBurst(player.x+40, player.y, "#cccccc", 120, 22); applyShake(8,12);
+        }},
+        { name: "Auto Barrage", cd: 4, current: 0, desc: "Swords fire on attack (simulated).", action: () => {
+            if (swords > 0 && hitCheck(220)) { dummy.hp -= 120; spawnBurst(dummy.x, dummy.y, "#ddddff", 60, 18); }
+        }},
+        { name: "Blade Recall", cd: 10, current: 0, desc: "Swords return, slicing through enemies.", action: () => {
+            if (Math.abs(player.x - dummy.x) < 300) dummy.hp -= 220; spawnBurst(dummy.x, dummy.y, "#ffffff", 140, 28);
+        }},
+        { name: "Perfect Synchrony", cd: 12, current: 0, desc: "Increase sword fire attack speed.", action: () => {
+            // simulate increased damage window
+            if (hitCheck(220)) dummy.hp -= 200;
+            applyShake(12,18);
+        }}
+    ],
+    "God-Slaying Slash": [
+        { name: "Absolute Draw", cd: 25, current: 0, desc: "Charge blade stance.", action: () => {
+            addGhost(player.x, player.y, "#ffeeee"); applyShake(12,16);
+        }},
+        { name: "Heaven-Cleaver", cd: 35, current: 0, desc: "Slash ignores armor/shields.", action: () => {
+            if (hitCheck(280)) dummy.hp -= 600; spawnBurst(dummy.x, dummy.y, "#ffcccc", 260, 40); applyShake(50,80);
+        }},
+        { name: "Judgment Line", cd: 22, current: 0, desc: "Lingering damaging cut.", action: () => {
+            zones.push({ x: Math.min(player.x, dummy.x), y: dummy.y, r: 260, life: 300, type: "judgment" });
+            if (Math.abs(player.x - dummy.x) < 300) dummy.hp -= 180; applyShake(14,20);
+        }},
+        { name: "Divinity Severed", cd: 40, current: 0, desc: "Bosses take bonus true damage.", action: () => {
+            if (hitCheck(300)) dummy.hp -= 420; spawnBurst(dummy.x, dummy.y, "#ffeeaa", 240, 40); applyShake(30,50);
+        }}
+    ]
+};
+
+// persistent zones (fractured, gravity, etc.)
+const zones = [];
+let swords = 0;
+
+// Determine myAbilities from localStorage selection
+const selTech = localStorage.getItem("playerTech") || "Fracture Punch";
+const selPath = localStorage.getItem("playerPath") || "Rift Brawler";
+
+const myAbilities = abilitiesByTechnique[selTech] ? abilitiesByTechnique[selTech].map(a => ({...a})) : abilitiesByTechnique["Fracture Punch"].map(a => ({...a}));
+
+// UI & cooldown handling
+function initUI() {
+    document.getElementById('path-display').innerText = "PATH: " + (selPath || "UNKNOWN").toUpperCase();
+    document.getElementById('tech-display').innerText = (selTech || "UNARMED").toUpperCase();
+    const bar = document.getElementById('ability-bar');
+    bar.innerHTML = '';
+    myAbilities.forEach((a, i) => {
+        const row = document.createElement('div');
+        row.className = 'ability-row';
+        row.id = `row-${i}`;
+        row.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px;"><div class="ability-name">${a.name}</div><div class="ability-desc">${a.desc}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;"><div class="ability-key">${i+1}</div><div id="cool-${i}" style="font-size:11px;color:#aaa;width:40px;text-align:center;"></div></div>`;
+        bar.appendChild(row);
+    });
+}
+
+// --- INPUT ---
 const keys = {};
 window.onkeydown = (e) => {
     keys[e.key.toLowerCase()] = true;
     if(['1','2','3','4'].includes(e.key)) {
-        let a = myAbilities[parseInt(e.key)-1];
-        if(a && a.current <= 0) { a.action(); a.current = a.cd; }
+        let idx = parseInt(e.key)-1;
+        let a = myAbilities[idx];
+        if(a && a.current <= 0) { 
+            a.action(); 
+            a.current = a.cd; 
+            // flash UI
+            const row = document.getElementById(`row-${idx}`);
+            if (row) { row.style.transform = 'translateX(-6px)'; setTimeout(()=>row.style.transform='translateX(0)',120); }
+        }
     }
-    
-    // --- UPDATED DASH LOGIC ---
     if(e.key === 'q' && player.dashCd <= 0) {
         player.isDashing = true;
-        player.velX = player.dir * 45; // High speed forward
-        player.velY = 0; // Lock height for air dashing
-        player.dashCd = 50; // Reset Cooldown
+        player.velX = player.dir * 45;
+        player.velY = 0;
+        player.dashCd = 50;
         applyShake(10, 15);
         spawnBurst(player.x, player.y + 30, "white", 30);
-        
-        // Disable dashing state after a short burst
         setTimeout(() => { player.isDashing = false; }, 150);
     }
-
     if(e.code === 'Space' && player.jumps < 2) { 
         player.velY = -15; 
         player.jumps++; 
@@ -199,18 +368,17 @@ window.onmousedown = () => {
     }
 };
 
-// --- CORE LOOP ---
+// --- UPDATE & DRAW LOOP ---
 function update() {
     let s = keys.shift ? player.speed * 1.8 : player.speed;
     
-    // Dash overrides normal movement
     if (player.isDashing) {
         addGhost(player.x, player.y, player.color);
     } else {
         if(keys.a) { player.velX = -s; player.dir = -1; }
         else if(keys.d) { player.velX = s; player.dir = 1; }
         else { player.velX *= 0.8; }
-        player.velY += 0.8; // Gravity only applies when not dashing
+        player.velY += 0.8;
     }
 
     player.x += player.velX; 
@@ -227,13 +395,47 @@ function update() {
         }
     });
 
+    // zones processing
+    for (let i = zones.length - 1; i >= 0; i--) {
+        zones[i].life--;
+        if (zones[i].life <= 0) zones.splice(i,1);
+        else {
+            const z = zones[i];
+            // simple effects on dummy if inside
+            const dx = dummy.x - z.x;
+            const dy = dummy.y - z.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < z.r) {
+                if (z.type === "pull" || z.type === "pull-strong") {
+                    let strength = z.type === "pull-strong" ? 1.2 : 0.4;
+                    dummy.velX += (z.x - dummy.x) / 100 * strength;
+                    dummy.velY += (z.y - dummy.y) / 200 * strength;
+                } else if (z.type === "root") {
+                    dummy.velX *= 0.4;
+                } else if (z.type === "pressure") {
+                    // take increased damage over time
+                    if (Math.random() < 0.04) dummy.hp -= 2;
+                } else if (z.type === "judgment") {
+                    if (Math.random() < 0.02) dummy.hp -= 6;
+                }
+            }
+        }
+    }
+
     // Trail cleanup
     for(let i = ghosts.length - 1; i >= 0; i--) {
-        ghosts[i].life -= 0.1;
+        ghosts[i].life -= 0.02;
         if(ghosts[i].life <= 0) ghosts.splice(i, 1);
     }
 
-    myAbilities.forEach((a, i) => { if(a.current > 0) a.current -= 1/60; document.getElementById(`row-${i}`).style.opacity = a.current > 0 ? "0.3" : "1"; });
+    // update ability cooldowns and UI
+    myAbilities.forEach((a, i) => { 
+        if(a.current > 0) a.current -= 1/60; 
+        const el = document.getElementById(`cool-${i}`);
+        if (el) el.innerText = a.current > 0 ? Math.ceil(a.current) + "s" : "";
+        const row = document.getElementById(`row-${i}`);
+        if (row) row.style.opacity = a.current > 0 ? "0.5" : "1";
+    });
 
     for(let i=particles.length-1; i>=0; i--) { particles[i].update(); if(particles[i].life <= 0) particles.splice(i, 1); }
 
@@ -252,9 +454,22 @@ function draw() {
     // Environment
     ctx.fillStyle = "#111"; ctx.fillRect(0, canvas.height-100, canvas.width, 100);
     
+    // Draw zones visually
+    zones.forEach(z => {
+        ctx.globalAlpha = 0.12;
+        if (z.type === "pull") ctx.fillStyle = "#3366ff";
+        else if (z.type === "pull-strong") ctx.fillStyle = "#6633ff";
+        else if (z.type === "judgment") ctx.fillStyle = "#ff8888";
+        else ctx.fillStyle = "#666666";
+        ctx.beginPath();
+        ctx.arc(z.x, z.y, z.r, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    });
+
     // Draw Ghost Trail
     ghosts.forEach(g => {
-        ctx.globalAlpha = g.life * 0.4;
+        ctx.globalAlpha = Math.max(0, g.life * 0.4);
         ctx.fillStyle = g.color;
         ctx.fillRect(g.x, g.y, player.w, player.h);
     });
@@ -282,13 +497,6 @@ function draw() {
 
     update();
     requestAnimationFrame(draw);
-}
-
-function initUI() {
-    document.getElementById('path-display').innerText = "PATH: " + player.path.toUpperCase();
-    document.getElementById('tech-display').innerText = player.tech.toUpperCase();
-    const bar = document.getElementById('ability-bar');
-    myAbilities.forEach((a, i) => { bar.innerHTML += `<div class="ability-row" id="row-${i}"><div class="ability-name">${a.name}</div><div class="ability-icon">${i+1}</div></div>`; });
 }
 
 initUI(); draw();
