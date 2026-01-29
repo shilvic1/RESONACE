@@ -195,6 +195,18 @@
             color: white; text-decoration: none; font-size: 1.5rem;
             cursor: pointer; opacity: 0.6;
         }
+
+        .equip-btn {
+            margin-top: 10px;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.08);
+            color: #ccc;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .equip-btn:hover { color: white; border-color: rgba(255,255,255,0.2); }
     </style>
 </head>
 <body>
@@ -246,6 +258,7 @@
                 <h1 id="card-name" style="margin: 5px 0; font-size: 2.5rem;">NONE</h1>
                 <div id="card-path" style="color: #555; font-size: 0.9rem;">RESONANCE REQUIRED</div>
                 <p id="card-desc" class="tech-desc">Your journey has not yet begun. Choose a spin type to manifest your technique.</p>
+                <button id="equip-btn" class="equip-btn" onclick="equipTech()" style="display:none;">Equip Technique</button>
             </div>
             
             <div class="btn-group">
@@ -286,11 +299,12 @@
         function closeScreens() { document.querySelectorAll('.screen').forEach(s => s.style.display = 'none'); }
 
         function tryPlay() {
-            if (!currentTech) {
+            if (!localStorage.getItem("playerTech")) {
                 const nb = document.getElementById('notif-box');
                 nb.style.display = 'block';
                 setTimeout(() => nb.style.display = 'none', 3000);
             } else {
+                // Player has a technique equipped, go to game
                 window.location.href = "game.html";
             }
         }
@@ -320,21 +334,27 @@
             let pool = (type === 'legendary') ? techniques.filter(t => t.rarity !== 'Common') : techniques;
             const totalWeight = pool.reduce((acc, t) => acc + t.weight, 0);
             let random = Math.random() * totalWeight;
-            
+            let chosen = pool[0];
+
             for (let t of pool) {
                 if (random < t.weight) {
-                    currentTech = t;
+                    chosen = t;
                     break;
                 }
                 random -= t.weight;
             }
+            currentTech = chosen;
             updateCard(currentTech);
             document.getElementById('tech-card').style.boxShadow = `0 0 60px ${currentTech.color}`;
-        }
+
+            // Show equip button
+            document.getElementById('equip-btn').style.display = 'inline-block';
+        } 
 
         function updateCard(tech) {
+            if (!tech) return;
             document.getElementById('card-name').innerText = tech.name.toUpperCase();
-            document.getElementById('card-name').style.color = tech.color;
+            document.getElementById('card-name').style.color = getComputedStyle(document.documentElement).getPropertyValue(tech.color.replace('var(','').replace(')','')) || tech.color;
             document.getElementById('card-path').innerText = tech.path.toUpperCase();
             document.getElementById('card-rarity-pill').innerText = tech.rarity;
             document.getElementById('card-rarity-pill').style.backgroundColor = tech.color;
@@ -346,6 +366,36 @@
             document.getElementById('reg-count').innerText = spins.regular;
             document.getElementById('leg-count').innerText = spins.legendary;
         }
+
+        function equipTech() {
+            if (!currentTech) return alert("No technique to equip.");
+            localStorage.setItem("playerTech", currentTech.name);
+            localStorage.setItem("playerPath", currentTech.path);
+            // Save a timestamp for reference
+            localStorage.setItem("playerTechSavedAt", new Date().toISOString());
+            // Provide quick feedback
+            const btn = document.getElementById('equip-btn');
+            btn.innerText = 'Equipped';
+            setTimeout(() => btn.style.display = 'none', 1200);
+        }
+
+        // Initialize card with any previously equipped technique
+        function loadEquipped() {
+            const name = localStorage.getItem("playerTech");
+            const path = localStorage.getItem("playerPath");
+            if (name && path) {
+                const tech = techniques.find(t => t.name === name && t.path === path);
+                if (tech) {
+                    currentTech = tech;
+                    updateCard(tech);
+                    document.getElementById('equip-btn').style.display = 'none';
+                }
+            }
+        }
+
+        // run
+        updateSpinUI();
+        loadEquipped();
     </script>
 </body>
 </html>
