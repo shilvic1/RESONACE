@@ -64,18 +64,17 @@
             background: linear-gradient(90deg, rgba(0,0,0,0.9) 0%, transparent 50%);
         }
 
-        /* UPDATED LOGO STYLING */
         .logo-wrap {
             position: absolute;
             top: 50px; right: 80px;
-            text-align: center; /* Centered relative to its container */
+            text-align: center; 
         }
 
         .logo-img { 
-            width: 180px; /* Smaller size */
+            width: 180px; 
             height: 180px;
             object-fit: cover;
-            border-radius: 50%; /* Rounded edges */
+            border-radius: 50%; 
             border: 2px solid rgba(255, 255, 255, 0.1);
             filter: drop-shadow(0 0 20px rgba(255,255,255,0.2)); 
             animation: breathe 4s ease-in-out infinite;
@@ -89,7 +88,7 @@
         .event-text {
             color: #4facfe;
             font-family: 'Oswald', sans-serif;
-            font-size: 0.9rem; /* Slightly smaller to match logo */
+            font-size: 0.9rem;
             letter-spacing: 2px;
             margin-top: 10px;
             text-shadow: 0 0 10px #4facfe;
@@ -107,7 +106,12 @@
             text-transform: uppercase;
         }
 
-        .nav-btn:hover { color: white; transform: translateX(20px); text-shadow: 0 0 20px white; }
+        .nav-btn:hover {
+            color: white;
+            transform: translateX(25px) scale(1.05);
+            text-shadow: 0 0 25px white, 0 0 40px var(--accent);
+            letter-spacing: 2px;
+        }
         .btn-play { color: white; font-size: 5rem; border-bottom: 4px solid var(--accent); width: fit-content; }
 
         /* --- SCREENS --- */
@@ -117,6 +121,12 @@
             z-index: 100;
             display: none;
             padding: 40px;
+            animation: screenFade 0.4s ease;
+        }
+
+        @keyframes screenFade {
+            from { opacity: 0; transform: scale(1.05); filter: blur(10px); }
+            to { opacity: 1; transform: scale(1); filter: blur(0); }
         }
 
         /* --- GACHA UI --- */
@@ -207,14 +217,104 @@
             font-weight: bold;
         }
         .equip-btn:hover { color: white; border-color: rgba(255,255,255,0.2); }
+
+        /* --- RIFT OVERLAYS & ANIMATIONS --- */
+        .rift-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2;
+            background: radial-gradient(circle at 50% 50%, rgba(120,0,255,0.08), transparent 60%);
+            animation: pulseRift 6s infinite ease-in-out;
+            pointer-events: none;
+        }
+
+        @keyframes pulseRift {
+            0%,100% { transform: scale(1); opacity: 0.4; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+        }
+
+        .scanlines {
+            position: fixed;
+            inset: 0;
+            z-index: 3;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                to bottom,
+                rgba(255,255,255,0.03),
+                rgba(255,255,255,0.03) 1px,
+                transparent 2px,
+                transparent 4px
+            );
+            opacity: 0.2;
+        }
+
+        .anima-particles {
+            position: fixed;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .anima-particle {
+            position: absolute;
+            border-radius: 50%;
+            animation: floatUp linear infinite;
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translateY(110vh) translateX(0) scale(1);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.7;
+            }
+            90% {
+                opacity: 0.7;
+            }
+            100% {
+                transform: translateY(-10vh) translateX(50px) scale(0.5);
+                opacity: 0;
+            }
+        }
+
+        /* --- BOOT SCREEN --- */
+        #boot-screen {
+            position: fixed;
+            inset: 0;
+            background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            font-size: 2rem;
+            letter-spacing: 3px;
+            animation: bootFade 2s forwards;
+            pointer-events: none;
+        }
+
+        @keyframes bootFade {
+            0% { opacity: 1; visibility: visible; }
+            80% { opacity: 1; visibility: visible; }
+            100% { opacity: 0; visibility: hidden; }
+        }
     </style>
 </head>
 <body>
+
+    <div id="boot-screen">
+        <h1>INITIALIZING RESONANCE...</h1>
+    </div>
 
     <div class="fog-container">
         <div class="fog fog-fast"></div>
         <div class="fog fog-slow"></div>
     </div>
+
+    <div class="rift-overlay"></div>
+    <div class="anima-particles"></div>
+    <div class="scanlines"></div>
 
     <div class="main-ui">
         <div class="logo-wrap">
@@ -227,7 +327,6 @@
             <button class="nav-btn" onclick="openScreen('gacha-screen')">Customize</button>
             <button class="nav-btn">Slots</button>
             <button class="nav-btn" onclick="openScreen('credits-screen')">Credits</button>
-            <button class="nav-btn">AFK</button>
         </nav>
     </div>
 
@@ -246,10 +345,10 @@
         </div>
 
         <div class="rarity-legend">
-            <div class="legend-item"><span>Mythic</span> <span style="color:var(--mythic)">0.1%</span></div>
-            <div class="legend-item"><span>Legendary</span> <span style="color:var(--legendary)">1%</span></div>
-            <div class="legend-item"><span>Epic</span> <span style="color:var(--epic)">10%</span></div>
-            <div class="legend-item"><span>Rare</span> <span style="color:var(--rare)">25%</span></div>
+            <div class="legend-item"><span>Mythic</span> <span style="color:var(--mythic)">1%</span></div>
+            <div class="legend-item"><span>Legendary</span> <span style="color:var(--legendary)">9%</span></div>
+            <div class="legend-item"><span>Epic</span> <span style="color:var(--epic)">30%</span></div>
+            <div class="legend-item"><span>Rare</span> <span style="color:var(--rare)">60%</span></div>
         </div>
 
         <div class="gacha-interface">
@@ -272,8 +371,7 @@
         <div class="back-link" onclick="closeScreens()">← BACK</div>
         <div class="gacha-interface">
             <h1 style="font-size: 4rem; margin-bottom: 0;">RESONACE</h1>
-            <p style="font-size: 1.5rem; color: #888;">Lead Developer: <strong>Ruben</strong></p>
-            <p style="font-size: 1.5rem; color: #888;">Lead Designer: <strong>Ruben</strong></p>
+            <p style="font-size: 1.5rem; color: #888;">System Ready.</p>
         </div>
     </div>
 
@@ -283,16 +381,27 @@
         let currentTech = null;
         let spins = { regular: 25, legendary: 25 };
 
+        // EXACT NAMES MATCHING GAME.HTML LOGIC
         const techniques = [
-            { name: "Fracture Punch", path: "Rift Brawler", rarity: "Common", weight: 60, color: "var(--common)", desc: "A heavy straight lead that sends a small shockwave forward." },
-            { name: "Crush Dash", path: "Rift Brawler", rarity: "Rare", weight: 25, color: "var(--rare)", desc: "A fast lunge that grabs the first enemy hit and slams them into the ground." },
-            { name: "Continental Impact", path: "Rift Brawler", rarity: "Legendary", weight: 1, color: "var(--legendary)", desc: "High-altitude leap and crash that creates a permanent Fractured debuff zone." },
-            { name: "World-Ender’s Embrace", path: "Rift Brawler", rarity: "Mythic", weight: 0.1, color: "var(--mythic)", desc: "A cutscene-style grab pulls target into a sub-dimension for a 100-hit flurry." },
-            { name: "Void Bolt", path: "Void Manifestor", rarity: "Common", weight: 60, color: "var(--common)", desc: "Fast-firing projectile with slight homing capabilities." },
-            { name: "Collapse Sphere", path: "Void Manifestor", rarity: "Rare", weight: 25, color: "var(--rare)", desc: "A gravity orb that pulls enemies toward its center for 3 seconds." },
-            { name: "Supernova Protocol", path: "Void Manifestor", rarity: "Mythic", weight: 0.1, color: "var(--mythic)", desc: "Become a collapsing star, pulling everyone in before a screen-clearing blast." },
-            { name: "Blade Works", path: "Weaponbound", rarity: "Legendary", weight: 1, color: "var(--legendary)", desc: "Summons 50 swords that fire automatically whenever you attack." },
-            { name: "God-Slaying Slash", path: "Weaponbound", rarity: "Mythic", weight: 0.1, color: "var(--mythic)", desc: "A single horizontal cut that ignores all armor and shields." }
+            { name: "Fracture Fist", path: "Rift Brawler", rarity: "Rare", weight: 60, color: "var(--rare)", desc: "A balanced hand-to-hand Anima style built around shockwaves and combo pressure." },
+            { name: "Blood Crash", path: "Rift Brawler", rarity: "Epic", weight: 30, color: "var(--epic)", desc: "A high-risk fighting style that becomes stronger as your health drops." },
+            { name: "Ironbreaker", path: "Rift Brawler", rarity: "Legendary", weight: 9, color: "var(--legendary)", desc: "A tank-style brawler designed to crush defense and overpower blocks." },
+            { name: "Colossus Vein", path: "Rift Brawler", rarity: "Mythic", weight: 1, color: "var(--mythic)", desc: "The heaviest and strongest Brawler technique." },
+            
+            { name: "Gravity Well", path: "Void Manifestor", rarity: "Rare", weight: 60, color: "var(--rare)", desc: "A spatial technique focusing on localized gravity wells, phase-blinking, and singularity detonations." },
+            { name: "Astral Flame", path: "Void Manifestor", rarity: "Epic", weight: 30, color: "var(--epic)", desc: "A celestial technique utilizing solar rings, heat lances, and meteor strikes to burn enemies." },
+            { name: "Chrono Veil", path: "Void Manifestor", rarity: "Legendary", weight: 9, color: "var(--legendary)", desc: "A temporal technique allowing time slices, position rewinds, and freezing enemies in time." },
+            { name: "Void Emperor", path: "Void Manifestor", rarity: "Mythic", weight: 1, color: "var(--mythic)", desc: "A powerful void technique wielding void spears, storms, and infinite collapse beams." },
+            
+            { name: "Soulblade", path: "Weaponbound", rarity: "Rare", weight: 60, color: "var(--rare)", desc: "A cursed sword technique utilizing phantom slashes, chain pulls, and weapon shifting." },
+            { name: "Iron Reaper", path: "Weaponbound", rarity: "Epic", weight: 30, color: "var(--epic)", desc: "A heavy scythe style built around wide bleed sweeps and fatal harvests." },
+            { name: "Storm Spear", path: "Weaponbound", rarity: "Legendary", weight: 9, color: "var(--legendary)", desc: "A high-speed lightning spear technique deploying chain volts and storm recalls." },
+            { name: "Dragon Fang", path: "Weaponbound", rarity: "Mythic", weight: 1, color: "var(--mythic)", desc: "A draconic style utilizing marks, scale shields, and massive wyrm fires." },
+            
+            { name: "Phantom Legion", path: "Echo Caller", rarity: "Rare", weight: 60, color: "var(--rare)", desc: "A summoning style focused on creating clones, swap-stepping, and legion command." },
+            { name: "Soul Puppeteer", path: "Echo Caller", rarity: "Epic", weight: 30, color: "var(--epic)", desc: "A crowd control style using puppet threads to trap and dominate enemies." },
+            { name: "Spirit Beast", path: "Echo Caller", rarity: "Legendary", weight: 9, color: "var(--legendary)", desc: "An animal spirit style summoning wolves, bears, and falcons for support." },
+            { name: "Echo Sovereign", path: "Echo Caller", rarity: "Mythic", weight: 1, color: "var(--mythic)", desc: "A royal summoning technique summoning elite knights and army units." }
         ];
 
         function openScreen(id) { document.getElementById(id).style.display = 'block'; }
@@ -304,7 +413,6 @@
                 nb.style.display = 'block';
                 setTimeout(() => nb.style.display = 'none', 3000);
             } else {
-                // Player has a technique equipped, go to game
                 window.location.href = "game.html";
             }
         }
@@ -321,17 +429,27 @@
             let rolls = 0;
             const interval = setInterval(() => {
                 updateCard(techniques[Math.floor(Math.random() * techniques.length)]);
+
+                document.getElementById("tech-card").style.transform =
+                    `rotate(${Math.random() * 4 - 2}deg) scale(${1 + Math.random() * 0.02})`;
+
                 rolls++;
+
                 if (rolls > 12) {
                     clearInterval(interval);
+                    document.getElementById("tech-card").style.transform = "none";
                     finalizeSpin(type);
-                    btnReg.disabled = false; btnLeg.disabled = false;
+                    btnReg.disabled = false;
+                    btnLeg.disabled = false;
                 }
-            }, 80);
+            }, 70);
         }
 
         function finalizeSpin(type) {
-            let pool = (type === 'legendary') ? techniques.filter(t => t.rarity !== 'Common') : techniques;
+            let pool = (type === 'legendary') ? techniques.filter(t => t.rarity === 'Legendary' || t.rarity === 'Mythic') : techniques;
+            // Fallback if pool is empty
+            if (pool.length === 0) pool = techniques;
+
             const totalWeight = pool.reduce((acc, t) => acc + t.weight, 0);
             let random = Math.random() * totalWeight;
             let chosen = pool[0];
@@ -347,17 +465,29 @@
             updateCard(currentTech);
             document.getElementById('tech-card').style.boxShadow = `0 0 60px ${currentTech.color}`;
 
-            // Show equip button
             document.getElementById('equip-btn').style.display = 'inline-block';
         } 
 
         function updateCard(tech) {
             if (!tech) return;
             document.getElementById('card-name').innerText = tech.name.toUpperCase();
-            document.getElementById('card-name').style.color = getComputedStyle(document.documentElement).getPropertyValue(tech.color.replace('var(','').replace(')','')) || tech.color;
+            
+            // Handle CSS vars in JS
+            let col = tech.color;
+            const colorMap = {
+                Common: "#d1d1d1",
+                Rare: "#3a86ff",
+                Epic: "#a044ff",
+                Legendary: "#ffbe0b",
+                Mythic: "#ff0044"
+            };
+
+            col = colorMap[tech.rarity] || col;
+            
+            document.getElementById('card-name').style.color = col;
             document.getElementById('card-path').innerText = tech.path.toUpperCase();
             document.getElementById('card-rarity-pill').innerText = tech.rarity;
-            document.getElementById('card-rarity-pill').style.backgroundColor = tech.color;
+            document.getElementById('card-rarity-pill').style.backgroundColor = col;
             document.getElementById('card-rarity-pill').style.color = (tech.rarity === 'Common' || tech.rarity === 'Legendary') ? 'black' : 'white';
             document.getElementById('card-desc').innerText = tech.desc;
         }
@@ -368,23 +498,29 @@
         }
 
         function equipTech() {
-            if (!currentTech) return alert("No technique to equip.");
+            if (!currentTech) return;
+
             localStorage.setItem("playerTech", currentTech.name);
             localStorage.setItem("playerPath", currentTech.path);
-            // Save a timestamp for reference
-            localStorage.setItem("playerTechSavedAt", new Date().toISOString());
-            // Provide quick feedback
+
+            document.body.style.filter = "hue-rotate(40deg) brightness(1.2)";
+
             const btn = document.getElementById('equip-btn');
-            btn.innerText = 'Equipped';
-            setTimeout(() => btn.style.display = 'none', 1200);
+            btn.innerText = 'RESONANCE SYNCED';
+            btn.style.boxShadow = `0 0 30px ${currentTech.color}`;
+
+            setTimeout(() => {
+                document.body.style.filter = "none";
+                btn.innerText = 'Equipped';
+                btn.style.display = 'none';
+            }, 1200);
         }
 
-        // Initialize card with any previously equipped technique
         function loadEquipped() {
             const name = localStorage.getItem("playerTech");
             const path = localStorage.getItem("playerPath");
             if (name && path) {
-                const tech = techniques.find(t => t.name === name && t.path === path);
+                const tech = techniques.find(t => t.name === name);
                 if (tech) {
                     currentTech = tech;
                     updateCard(tech);
@@ -393,9 +529,44 @@
             }
         }
 
-        // run
+        function createParticles() {
+            const container = document.querySelector('.anima-particles');
+            if (!container) return;
+            const colors = ['rgba(120,0,255,0.25)', 'rgba(58,134,255,0.25)', 'rgba(160,68,255,0.25)'];
+            for (let i = 0; i < 40; i++) {
+                const p = document.createElement('div');
+                p.className = 'anima-particle';
+                const size = Math.random() * 4 + 2;
+                p.style.width = `${size}px`;
+                p.style.height = `${size}px`;
+                p.style.left = `${Math.random() * 100}%`;
+                p.style.bottom = `${Math.random() * -20}px`;
+                p.style.background = colors[Math.floor(Math.random() * colors.length)];
+                p.style.boxShadow = `0 0 8px ${p.style.background}`;
+                p.style.animationDuration = `${Math.random() * 15 + 10}s`;
+                p.style.animationDelay = `${Math.random() * -15}s`;
+                container.appendChild(p);
+            }
+        }
+
+        // Sound System
+        const uiHover = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-light-button-2580.mp3");
+        const uiClick = new Audio("https://assets.mixkit.co/sfx/preview/mixkit-unlock-game-notification-253.mp3");
+
+        document.querySelectorAll("button").forEach(btn => {
+            btn.addEventListener("mouseenter", () => {
+                uiHover.currentTime = 0;
+                uiHover.play().catch(() => {});
+            });
+            btn.addEventListener("click", () => {
+                uiClick.currentTime = 0;
+                uiClick.play().catch(() => {});
+            });
+        });
+
         updateSpinUI();
         loadEquipped();
+        createParticles();
     </script>
 </body>
 </html>
